@@ -1,6 +1,6 @@
 /***************************************************************************//**
- *   @file   iio_adc_demo.h
- *   @brief  Header file of ADC Demo iio.
+ *   @file   iio_adc_demo.c
+ *   @brief  Source file of ADC Demo iio.
  *   @author RNechita (ramona.nechita@analog.com)
 ********************************************************************************
  * Copyright 2021(c) Analog Devices, Inc.
@@ -37,49 +37,61 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *******************************************************************************/
 
-#ifndef IIO_DEMO_ADC
-#define IIO_DEMO_ADC
+#include <stdio.h>
+#include <string.h>
+#include <inttypes.h>
+#include "iio_adc_demo.h"
+#include "iio_types.h"
+#include "error.h"
 
-#include <stdlib.h>
-#include "adc_demo.h"
-#include "iio.h"
+struct iio_channel iio_adc_channels[MAX_NR_CHANNELS];
 
-#define MAX_NR_CHANNELS 10
-#define MAX_NR_ATTRIBUTES 5
-#define TEST_CHANNEL_NO 2
-#define MAX_SAMPLES_PER_CHANNEL 800
-
-extern struct iio_channel iio_adc_channels[MAX_NR_CHANNELS];
-
-extern struct iio_attribute adc_channel_attributes[MAX_NR_ATTRIBUTES];
-
-extern struct iio_attribute iio_adc_global_attributes[MAX_NR_ATTRIBUTES];
-
-enum iio_adc_demo_attributes {
-	ADC_CHANNEL_ATTR,
-	ADC_GLOBAL_ATTR,
+static struct scan_type adc_scan_type = {
+	.sign = 's',
+	.realbits = 16,
+	.storagebits = 16,
+	.shift = 0,
+	.is_big_endian = false
 };
 
-#define ADC_DEMO_ATTR(_name, _priv) {\
-	.name = _name,\
-	.priv = _priv,\
-	.show = get_adc_demo_attr,\
-	.store = set_adc_demo_attr \
+struct iio_attribute adc_channel_attributes[] = {
+	ADC_DEMO_ATTR("adc_channel_attr", ADC_CHANNEL_ATTR),
+	END_ATTRIBUTES_ARRAY,
+};
+
+struct iio_attribute iio_adc_global_attributes[] = {
+	ADC_DEMO_ATTR("adc_global_attr", ADC_GLOBAL_ATTR),
+	END_ATTRIBUTES_ARRAY,
+};
+/***************************************************************************//**
+ * @brief initialize the device number of channels with the number of
+ * 				channels in the init_param
+ * @param desc - adc dev descriptor
+ * @param mask - the new number of active channels
+ * @return SUCCESS in case of success, -EINVAL in case of invalid descriptor.
+*******************************************************************************/
+int32_t init_adc_channels(struct adc_demo_desc* desc, uint32_t mask)
+{
+	uint32_t i;
+
+	if(!desc)
+		return -EINVAL;
+
+	for(i = 0; i < mask; i++) {
+		char buff[12];
+		sprintf(buff,"ad_channel%"PRIu32"",i);
+		struct iio_channel ch = {
+			.name = buff,
+			.ch_type = IIO_VOLTAGE,
+			.channel = i,
+			.scan_index = i,
+			.indexed = true,
+			.scan_type = &adc_scan_type,
+			.attributes = adc_channel_attributes,
+			.ch_out = false
+		};
+		iio_adc_channels[i] = ch;
+	}
+
+	return SUCCESS;
 }
-
-#define ADC_DEMO_DEV(_numch) {\
-	.num_ch = _numch, \
-	.channels = iio_adc_channels, \
-	.attributes = iio_adc_global_attributes,	\
-	.debug_attributes = NULL,	\
-	.buffer_attributes = NULL,	\
-	.prepare_transfer = update_adc_channels,	\
-	.end_transfer = close_adc_channels,	\
-	.read_dev = (int32_t (*)())adc_read_samples,	\
-	.debug_reg_read = (int32_t (*)()) adc_demo_reg_read,	\
-	.debug_reg_write = (int32_t (*)()) adc_demo_reg_write	\
-}
-
-int32_t init_adc_channels(struct adc_demo_desc* dev, uint32_t mask);
-
-#endif /* IIO_DEMO_ADC */

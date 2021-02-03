@@ -42,10 +42,42 @@
 
 #include <stdlib.h>
 #include "dac_demo.h"
+#include "iio.h"
 
-struct iio_device dac_demo_iio_descriptor = {
-	.debug_reg_read = (int32_t (*)()) dac_demo_reg_read,
-	.debug_reg_write = (int32_t (*)()) dac_demo_reg_write
+#define MAX_NR_CHANNELS 10
+#define MAX_NR_ATTRIBUTES 5
+
+#define DAC_DEMO_ATTR(_name, _priv) {\
+	.name = _name,\
+	.priv = _priv,\
+	.show = get_dac_demo_attr,\
+	.store = set_dac_demo_attr\
+}
+
+extern struct iio_channel iio_dac_channels[MAX_NR_CHANNELS];
+
+#define DAC_DEMO_DEV(_numch) {\
+	.num_ch = _numch, \
+	.channels = iio_dac_channels, \
+	.attributes = dac_global_attributes,	\
+	.debug_attributes = NULL,	\
+	.buffer_attributes = NULL,	\
+	.prepare_transfer = update_dac_channels,	\
+	.end_transfer = close_dac_channels,	\
+	.read_dev = (int32_t (*)())dac_write_samples,	\
+	.debug_reg_read = (int32_t (*)()) dac_demo_reg_read,	\
+	.debug_reg_write = (int32_t (*)()) dac_demo_reg_write	\
+}
+
+enum iio_dac_demo_attributes {
+	DAC_CHANNEL_ATTR,
+	DAC_GLOBAL_ATTR,
 };
+
+extern struct iio_attribute dac_channel_attributes[MAX_NR_ATTRIBUTES];
+
+extern struct iio_attribute dac_global_attributes[MAX_NR_ATTRIBUTES];
+
+int32_t init_dac_channels(struct dac_demo_desc* desc, uint32_t mask);
 
 #endif /* IIO_DEMO_DAC */
