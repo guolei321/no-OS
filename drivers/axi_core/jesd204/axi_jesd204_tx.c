@@ -72,6 +72,8 @@
 
 #define JESD204_TX_REG_CONF0			0x210
 
+#define JESD204_TX_REG_LINK_CONF4		0x21C
+
 #define JESD204_TX_REG_LINK_STATUS		0x280
 
 #define JESD204_TX_REG_ILAS(x, y)		\
@@ -294,10 +296,21 @@ void axi_jesd204_tx_set_lane_ilas(struct axi_jesd204_tx *jesd,
 int32_t axi_jesd204_tx_apply_config(struct axi_jesd204_tx *jesd,
 				    struct jesd204_tx_config *config)
 {
+	uint16_t beats_per_multiframe;
 	uint32_t octets_per_multiframe;
 	uint32_t multiframe_align;
 	uint32_t val;
 	uint32_t lane;
+
+	if (PCORE_VERSION_MAJOR(config->version) >= 2 ||
+	    (PCORE_VERSION_MAJOR(config->version) == 1
+	     && PCORE_VERSION_MINOR(config->version) >= 6)) {
+		jesd->data_path_width_tpl = (jesd->data_path_width >> 8) & 0x0F;
+		jesd->data_path_width &= 0xFF;
+		beats_per_multiframe = ((config->octets_per_frame *
+					 config->frames_per_multiframe) / jesd->data_path_width_tpl) - 1;
+		axi_jesd204_tx_write(jesd, JESD204_TX_REG_LINK_CONF4, beats_per_multiframe);
+	}
 
 	octets_per_multiframe = config->frames_per_multiframe *
 				config->octets_per_frame;
@@ -384,6 +397,7 @@ int32_t axi_jesd204_tx_init(struct axi_jesd204_tx **jesd204,
 	else if (jesd->encoder >= JESD204_TX_ENCODER_MAX)
 		goto err;
 
+	jesd->config.version = version;
 	jesd->config.device_id = 0;
 	jesd->config.bank_id = 0;
 	jesd->config.enable_scrambling = true;
